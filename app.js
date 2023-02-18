@@ -1,12 +1,9 @@
-require("dotenv").config(); // Environment variables
+const md5 = require("md5");
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
 const {Schema} = require("mongoose");
-const encrypt = require("mongoose-encryption");
-const crypto = require("crypto");
-
 const {createNullProtoObjWherePossible} = require("ejs/lib/utils");
 
 const app = express();
@@ -27,20 +24,6 @@ async function main(){
         email: String,
         password: String
     });
-
-    // Creating environment variables
-    const encryptionKey = process.env.ENCRYPTION_KEY;
-    const signInKey = process.env.SIGN_IN_KEY;
-
-    // This plugin has to be placed before creating the User model
-    userSchema.plugin(encrypt, {
-        encryptedFields: ["password"],
-        additionalAuthenticatedFields: ["email"],
-        encryptionKey: encryptionKey,
-        signingKey: signInKey,
-        requireAuthenticationCode: null
-    });
-
 
     const User = mongoose.model("User", userSchema);
 
@@ -72,7 +55,7 @@ async function main(){
 
         const newUser = new User({
             email: userEmail,
-            password: userPassword
+            password: md5(userPassword)
         });
         newUser.save(err => {
             if(!err){
@@ -91,8 +74,9 @@ async function main(){
         User.findOne({email: userEmail}, (err, userFound) => {
             if(!err){
                 if(userFound) {
-                    if (userPassword === userFound.password) {
+                    if (md5(userPassword) === userFound.password) {
                         res.render("secrets");
+                        console.log("Correct Password");
                     } else {
                         console.log("Incorrect Password");
                     }
