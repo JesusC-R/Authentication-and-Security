@@ -1,3 +1,4 @@
+require("dotenv").config(); // Environment variables
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
@@ -15,7 +16,6 @@ app.use(express.static("public"));
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({extended: true}));
 
-
 main().catch(err => console.log(err));
 
 async function main(){
@@ -28,8 +28,9 @@ async function main(){
         password: String
     });
 
-    const encryptionKey = crypto.randomBytes(32).toString("base64");
-    const signInKey = crypto.randomBytes(64).toString("base64");
+    // Creating environment variables
+    const encryptionKey = process.env.ENCRYPTION_KEY;
+    const signInKey = process.env.SIGN_IN_KEY;
 
     // This plugin has to be placed before creating the User model
     userSchema.plugin(encrypt, {
