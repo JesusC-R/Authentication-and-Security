@@ -4,6 +4,8 @@ const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
 const {Schema} = require("mongoose");
+const bcrypt = require("bcrypt");
+const saltRounds = 10;
 const {createNullProtoObjWherePossible} = require("ejs/lib/utils");
 
 const app = express();
@@ -50,20 +52,23 @@ async function main(){
 
 
     app.post("/register", (req, res) => {
+
         const userEmail = req.body.username;
         const userPassword = req.body.password;
 
-        const newUser = new User({
-            email: userEmail,
-            password: md5(userPassword)
-        });
-        newUser.save(err => {
-            if(!err){
-                res.render("secrets");
-            }
-            else{
-                console.log(err);
-            }
+        bcrypt.hash(userPassword, saltRounds, (err, hash) => {
+            const newUser = new User({
+                email: userEmail,
+                password: hash
+            });
+            newUser.save(err => {
+                if(!err){
+                    res.render("secrets");
+                }
+                else{
+                    console.log(err);
+                }
+            });
         });
     });
 
@@ -72,21 +77,14 @@ async function main(){
         const userPassword = req.body.password;
 
         User.findOne({email: userEmail}, (err, userFound) => {
-            if(!err){
-                if(userFound) {
-                    if (md5(userPassword) === userFound.password) {
-                        res.render("secrets");
-                        console.log("Correct Password");
-                    } else {
-                        console.log("Incorrect Password");
-                    }
+            if(!err) {
+                if (userFound){
+                    bcrypt.compare(userPassword, userFound.password, (err, result) => {
+                        if(result === true){
+                            res.render("secrets");
+                        }
+                    });
                 }
-                else{
-                    console.log("User Not Found");
-                }
-            }
-            else{
-                console.log(err);
             }
         });
     });
