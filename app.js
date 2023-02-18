@@ -3,6 +3,8 @@ const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
 const {Schema} = require("mongoose");
+const encrypt = require("mongoose-encryption");
+const crypto = require("crypto");
 
 const {createNullProtoObjWherePossible} = require("ejs/lib/utils");
 
@@ -26,6 +28,19 @@ async function main(){
         password: String
     });
 
+    const encryptionKey = crypto.randomBytes(32).toString("base64");
+    const signInKey = crypto.randomBytes(64).toString("base64");
+
+    // This plugin has to be placed before creating the User model
+    userSchema.plugin(encrypt, {
+        encryptedFields: ["password"],
+        additionalAuthenticatedFields: ["email"],
+        encryptionKey: encryptionKey,
+        signingKey: signInKey,
+        requireAuthenticationCode: null
+    });
+
+
     const User = mongoose.model("User", userSchema);
 
     User.find((err, data) => {
@@ -36,9 +51,6 @@ async function main(){
             console.log(err);
         }
     });
-
-
-
 
     app.get("/", (req, res) => {
         res.render("home");
