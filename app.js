@@ -1,12 +1,12 @@
-const md5 = require("md5");
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
 const {Schema} = require("mongoose");
-const bcrypt = require("bcrypt");
-const saltRounds = 10;
-const {createNullProtoObjWherePossible} = require("ejs/lib/utils");
+const session = require("express-session");
+const passport = require("passport");
+const LocalStrategy = require("passport-local");
+const passportLocalMongoose = require("passport-local-mongoose");
 
 const app = express();
 
@@ -15,9 +15,18 @@ app.use(express.static("public"));
 app.set("view engine", "ejs");
 app.use(bodyParser.urlencoded({extended: true}));
 
+app.use(session({
+    secret: "3w8t8w3iugv2388324g",
+    resave: false,
+    saveUninitialized:false
+}));
+app.use(passport.initialize());
+app.use(passport.session());
+
+
 main().catch(err => console.log(err));
 
-async function main(){
+async function main() {
     const DataBaseName = "SecretsDB";
 
     await mongoose.connect("mongodb://127.0.0.1:27017/" + DataBaseName, {useNewUrlParser: true});
@@ -27,15 +36,19 @@ async function main(){
         password: String
     });
 
+    userSchema.plugin(passportLocalMongoose);
+
     const User = mongoose.model("User", userSchema);
 
-    User.find((err, data) => {
-        if(!err){
-            console.log(data);
-        }
-        else{
-            console.log(err);
-        }
+
+    // Required to serialize and deserialize user.
+    passport.use(new LocalStrategy(User.authenticate()));
+
+    passport.serializeUser(function(user, done) {
+        done(null, user);
+    });
+    passport.deserializeUser(function(user, done) {
+        done(null, user);
     });
 
     app.get("/", (req, res) => {
@@ -48,43 +61,50 @@ async function main(){
 
     app.get("/register", (req, res) => {
         res.render("register");
-    })
+    });
 
+    app.get("/secrets", (req, res) => {
+        if(req.isAuthenticated()){
+            res.render("secrets");
+        }
+        else{
+           res.redirect("/login");
+        }
+    });
+
+    app.get("/logout", (req, res) => {
+        req.logout(() => {
+            res.redirect("/");
+        });
+    });
 
     app.post("/register", (req, res) => {
-
-        const userEmail = req.body.username;
-        const userPassword = req.body.password;
-
-        bcrypt.hash(userPassword, saltRounds, (err, hash) => {
-            const newUser = new User({
-                email: userEmail,
-                password: hash
-            });
-            newUser.save(err => {
-                if(!err){
-                    res.render("secrets");
-                }
-                else{
-                    console.log(err);
-                }
-            });
+        User.register({username: req.body.username}, req.body.password, (err, user) => {
+            if(err){
+                console.log(err);
+                res.redirect("/register");
+            }
+            else {
+                passport.authenticate("local")(req, res, () => {
+                    res.redirect("/secrets");
+                });
+            }
         });
     });
 
     app.post("/login", (req, res) => {
-        const userEmail = req.body.username;
-        const userPassword = req.body.password;
-
-        User.findOne({email: userEmail}, (err, userFound) => {
-            if(!err) {
-                if (userFound){
-                    bcrypt.compare(userPassword, userFound.password, (err, result) => {
-                        if(result === true){
-                            res.render("secrets");
-                        }
-                    });
-                }
+        const user = new User ({
+            username: req.body.email,
+            password: req.body.password
+        });
+        req.login(user, err => {
+            if(err){
+                console.log(err);
+            }
+            else{
+                passport.authenticate("local")(req, res, () => {
+                    res.redirect("/secrets");
+                });
             }
         });
     });
